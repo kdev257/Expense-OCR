@@ -51,6 +51,9 @@ export default function App() {
       if (envKey) {
         setApiKey(envKey);
         fetchAvailableModels(envKey);
+      } else {
+        // Query models via server-side key fallback
+        fetchAvailableModels('');
       }
     }
 
@@ -67,17 +70,21 @@ export default function App() {
 
   const fetchAvailableModels = async (key) => {
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${key}`);
+      const url = key ? `/api/models?clientApiKey=${key}` : '/api/models';
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        const list = data.models
-          .filter(m => m.supportedGenerationMethods.includes('generateContent'))
-          .map(m => m.name.replace('models/', ''));
-        if (list.length > 0) {
-          setAvailableModels(list);
-          // If gemini-1.5-flash is available, use it, else pick the first
-          if (!list.includes(selectedModel)) {
-            setSelectedModel(list.includes('gemini-1.5-flash') ? 'gemini-1.5-flash' : list[0]);
+        if (data.models && data.models.length > 0) {
+          const list = data.models
+            .filter(m => m.supportedGenerationMethods.includes('generateContent'))
+            .map(m => m.name.replace('models/', ''));
+          if (list.length > 0) {
+            setAvailableModels(list);
+            // Default to gemini-1.5-flash if available, else pick the first
+            setSelectedModel(prev => {
+              if (list.includes(prev)) return prev;
+              return list.includes('gemini-1.5-flash') ? 'gemini-1.5-flash' : list[0];
+            });
           }
         }
       }
@@ -280,7 +287,7 @@ export default function App() {
             </button>
           </div>
           
-          {apiKey && availableModels.length > 0 && (
+          {availableModels.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.25rem' }}>
               <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>AI Model Profile</label>
               <select
