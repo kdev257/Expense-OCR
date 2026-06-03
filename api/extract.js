@@ -16,8 +16,12 @@ export default async function handler(req, res) {
 
   const { content, isImage, mimeType, modelName, clientApiKey } = req.body;
   
-  // Use the server-side env variable, falling back to Vite environment variable or client key
-  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || clientApiKey;
+  // Use the server-side env variable (supporting case variants), falling back to client key
+  const apiKey = process.env.GEMINI_API_KEY || 
+                 process.env.Gemini_API_Key || 
+                 process.env.VITE_GEMINI_API_KEY || 
+                 process.env.Vite_Gemini_API_Key || 
+                 clientApiKey;
 
   if (!apiKey) {
     const matchingKeys = Object.keys(process.env).filter(k => k.toLowerCase().includes('gemini') || k.toLowerCase().includes('key'));
