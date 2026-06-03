@@ -83,4 +83,4 @@ This project is fully ready for deployment on **Vercel** free tier:
 - **Spreadsheet Generation:** [SheetJS (xlsx)](https://github.com/SheetJS/sheetjs)
 - **Icons:** Lucide React
 
-<!-- redeploy trigger -->
+<!-- redeploy trigger 2 -->
