@@ -16,8 +16,8 @@ export default async function handler(req, res) {
 
   const { content, isImage, mimeType, modelName, clientApiKey } = req.body;
   
-  // Use the server-side env variable, falling back to client-provided key if available
-  const apiKey = process.env.GEMINI_API_KEY || clientApiKey;
+  // Use the server-side env variable, falling back to Vite environment variable or client key
+  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || clientApiKey;
 
   if (!apiKey) {
     return res.status(500).json({ 
