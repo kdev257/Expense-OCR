@@ -5,6 +5,21 @@ import Tesseract from 'tesseract.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 /**
+ * Converts a file to base64 string.
+ */
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      const base64 = reader.result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = (error) => reject(error);
+  });
+}
+
+/**
  * Helper to read PDF.js text layer.
  */
 async function extractTextFromTextLayer(pdfDoc) {
@@ -58,10 +73,9 @@ async function extractTextWithOCR(pdfDoc, onProgress) {
 }
 
 /**
- * Main function to parse a PDF file.
- * Automatically switches to OCR if the PDF text layer is empty (scanned PDF).
+ * Helper function to parse a PDF file.
  */
-export async function parsePDFInvoice(file, onProgress) {
+async function parsePDF(file, onProgress) {
   if (onProgress) onProgress({ stage: 'LOADING', message: 'Loading PDF file...', progress: 10 });
   
   const arrayBuffer = await file.arrayBuffer();
@@ -79,27 +93,45 @@ export async function parsePDFInvoice(file, onProgress) {
   }
   
   if (!text || text.trim().length < 5) {
-    throw new Error('Unable to extract any text from this PDF. Please ensure it is not password protected or corrupted.');
+    throw new Error('Unable to extract any text from this PDF.');
   }
   
   return text;
 }
 
 /**
- * Extends extraction by calling Gemini to retrieve structured invoice details.
+ * Main parser entrypoint. Supports both PDFs and standard Images.
  */
-export async function extractInvoiceDetails(text, apiKey, onProgress) {
-  if (onProgress) onProgress({ stage: 'AI_EXTRACTION', message: 'Analyzing text with AI...', progress: 85 });
+export async function parseDocument(file, apiKey, onProgress) {
+  if (file.type === 'application/pdf') {
+    // 1. Parse PDF to extract text
+    const text = await parsePDF(file, onProgress);
+    // 2. Call Gemini stable API with text content
+    return await extractInvoiceDetails(text, apiKey, onProgress, false);
+  } else if (file.type.startsWith('image/')) {
+    if (onProgress) onProgress({ stage: 'LOADING', message: 'Reading photo contents...', progress: 30 });
+    
+    // Convert photo to base64
+    const base64Data = await fileToBase64(file);
+    
+    // Call Gemini API directly with the image data (Multimodal Vision API)
+    return await extractInvoiceDetails(base64Data, apiKey, onProgress, true, file.type);
+  } else {
+    throw new Error('Unsupported file type. Please upload a PDF or an Image (JPG/PNG).');
+  }
+}
+
+/**
+ * Calls Gemini to retrieve structured invoice details.
+ * Supports text prompt or multimodal base64 image data.
+ */
+export async function extractInvoiceDetails(content, apiKey, onProgress, isImage = false, mimeType = '') {
+  if (onProgress) onProgress({ stage: 'AI_EXTRACTION', message: 'Analyzing document with Gemini AI...', progress: 85 });
 
   const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
   const prompt = `
-You are a highly accurate financial invoice data extractor. Analyze the invoice/receipt text provided below and extract the required fields as a JSON object.
-
-Text to analyze:
-------------------
-${text}
-------------------
+You are a highly accurate financial invoice data extractor. Analyze the document provided (text or image) and extract the required fields as a JSON object.
 
 Required Fields to Extract:
 1. "bill_number": The invoice, bill, receipt, or reference number (string). If not present or unclear, use null.
@@ -123,12 +155,28 @@ JSON Schema:
 }
 `;
 
+  // Build the parts payload based on input type
+  const parts = [];
+  
+  if (isImage) {
+    // Add image base64 data
+    parts.push({
+      inlineData: {
+        mimeType: mimeType,
+        data: content
+      }
+    });
+    // Add prompt instructions
+    parts.push({ text: prompt });
+  } else {
+    // Add text contents and instructions combined
+    parts.push({ text: `${prompt}\n\nInvoice Text Content:\n${content}` });
+  }
+
   const requestBody = {
     contents: [
       {
-        parts: [
-          { text: prompt }
-        ]
+        parts: parts
       }
     ],
     generationConfig: {

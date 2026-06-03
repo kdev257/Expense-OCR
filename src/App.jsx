@@ -17,7 +17,7 @@ import {
   Sparkles,
   FileSpreadsheet
 } from 'lucide-react';
-import { parsePDFInvoice, extractInvoiceDetails } from './utils/scanner';
+import { parseDocument } from './utils/scanner';
 import { exportToExcel } from './utils/excel';
 import './App.css';
 
@@ -89,28 +89,28 @@ export default function App() {
     setErrorMsg('');
 
     const files = Array.from(e.dataTransfer.files);
-    const pdfFiles = files.filter(file => file.type === 'application/pdf');
+    const allowedFiles = files.filter(file => file.type === 'application/pdf' || file.type.startsWith('image/'));
 
-    if (pdfFiles.length === 0) {
-      setErrorMsg('Please upload a valid PDF document.');
+    if (allowedFiles.length === 0) {
+      setErrorMsg('Please upload a valid PDF document or Image (JPG/PNG).');
       return;
     }
 
-    // Process first PDF file
-    processFile(pdfFiles[0]);
+    // Process first file
+    processFile(allowedFiles[0]);
   };
 
   const handleFileSelect = (e) => {
     setErrorMsg('');
     const files = Array.from(e.target.files);
-    const pdfFiles = files.filter(file => file.type === 'application/pdf');
+    const allowedFiles = files.filter(file => file.type === 'application/pdf' || file.type.startsWith('image/'));
 
-    if (pdfFiles.length === 0) {
-      setErrorMsg('Please upload a valid PDF document.');
+    if (allowedFiles.length === 0) {
+      setErrorMsg('Please upload a valid PDF document or Image (JPG/PNG).');
       return;
     }
 
-    processFile(pdfFiles[0]);
+    processFile(allowedFiles[0]);
   };
 
   // --- Core Processing Logic ---
@@ -128,8 +128,8 @@ export default function App() {
     });
 
     try {
-      // 1. Text / OCR Extraction
-      const extractedText = await parsePDFInvoice(file, (progressObj) => {
+      // Run unified document parser
+      const data = await parseDocument(file, apiKey, (progressObj) => {
         setProcessStatus({
           status: 'running',
           stage: progressObj.stage,
@@ -138,17 +138,7 @@ export default function App() {
         });
       });
 
-      // 2. AI Structured Extraction
-      const data = await extractInvoiceDetails(extractedText, apiKey, (progressObj) => {
-        setProcessStatus({
-          status: 'running',
-          stage: progressObj.stage,
-          message: progressObj.message,
-          progress: progressObj.progress
-        });
-      });
-
-      // 3. Save Record
+      // Save Record
       const newRecord = {
         id: 'rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
         fileName: file.name,
@@ -180,7 +170,7 @@ export default function App() {
 
     } catch (err) {
       console.error(err);
-      setErrorMsg(err.message || 'An error occurred during invoice extraction.');
+      setErrorMsg(err.message || 'An error occurred during document extraction.');
       setProcessStatus({
         status: 'error',
         stage: 'FAILED',
@@ -304,7 +294,7 @@ export default function App() {
           <span className="sidebar-card-title" style={{ fontSize: '0.8rem' }}>Instructions</span>
           <ol style={{ paddingLeft: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <li>Provide a Gemini API Key.</li>
-            <li>Drag & drop a bill/receipt PDF.</li>
+            <li>Drag & drop a bill PDF or image.</li>
             <li>Verify extracted fields in the table.</li>
             <li>Export the dataset to an Excel document.</li>
           </ol>
@@ -316,7 +306,7 @@ export default function App() {
         <header className="dashboard-header">
           <div className="header-title-sec">
             <h1>OCR Bill Processing Hub</h1>
-            <p>Convert unstructured PDF files into clean, structured accounting spreadsheets instantly.</p>
+            <p>Convert unstructured PDF files and invoice images into clean, structured accounting spreadsheets instantly.</p>
           </div>
         </header>
 
@@ -344,15 +334,15 @@ export default function App() {
             type="file" 
             ref={fileInputRef} 
             onChange={handleFileSelect} 
-            accept="application/pdf" 
+            accept="application/pdf, image/*" 
             className="file-input-hidden" 
           />
           <div className="upload-circle">
             <Upload size={28} />
           </div>
           <div className="upload-text">
-            <p className="upload-text-highlight">Drag & drop your expense PDF here, or click to browse</p>
-            <p className="upload-text-sub">Supports standardized invoices and hand-written bills (automatic OCR)</p>
+            <p className="upload-text-highlight">Drag & drop your expense PDF or Image here, or click to browse</p>
+            <p className="upload-text-sub">Supports PDFs, screenshots, photos, and scanned bills (automatic OCR)</p>
           </div>
         </div>
 
