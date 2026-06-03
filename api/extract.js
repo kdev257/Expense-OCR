@@ -20,8 +20,9 @@ export default async function handler(req, res) {
   const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || clientApiKey;
 
   if (!apiKey) {
+    const matchingKeys = Object.keys(process.env).filter(k => k.toLowerCase().includes('gemini') || k.toLowerCase().includes('key'));
     return res.status(500).json({ 
-      error: 'Gemini API Key is not configured on the server. Please add GEMINI_API_KEY to Vercel Environment Variables.' 
+      error: `Gemini API Key is not configured on the server. Please add GEMINI_API_KEY to Vercel Environment Variables. (Vercel env keys found: [${matchingKeys.join(', ')}])` 
     });
   }
 
