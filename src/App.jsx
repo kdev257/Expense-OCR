@@ -33,6 +33,8 @@ export default function App() {
     message: '',
     progress: 0
   });
+  const [availableModels, setAvailableModels] = useState(['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']);
+  const [selectedModel, setSelectedModel] = useState('gemini-1.5-flash');
   const [errorMsg, setErrorMsg] = useState('');
   const fileInputRef = useRef(null);
 
@@ -42,11 +44,13 @@ export default function App() {
     const savedKey = localStorage.getItem('gemini_api_key') || '';
     if (savedKey) {
       setApiKey(savedKey);
+      fetchAvailableModels(savedKey);
     } else {
       // Fallback to Vite env variables if set in production (Vercel)
       const envKey = import.meta.env.VITE_GEMINI_API_KEY || '';
       if (envKey) {
         setApiKey(envKey);
+        fetchAvailableModels(envKey);
       }
     }
 
@@ -61,6 +65,27 @@ export default function App() {
     }
   }, []);
 
+  const fetchAvailableModels = async (key) => {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${key}`);
+      if (res.ok) {
+        const data = await res.json();
+        const list = data.models
+          .filter(m => m.supportedGenerationMethods.includes('generateContent'))
+          .map(m => m.name.replace('models/', ''));
+        if (list.length > 0) {
+          setAvailableModels(list);
+          // If gemini-1.5-flash is available, use it, else pick the first
+          if (!list.includes(selectedModel)) {
+            setSelectedModel(list.includes('gemini-1.5-flash') ? 'gemini-1.5-flash' : list[0]);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed listing available models', err);
+    }
+  };
+
   // --- Save State to Storage ---
   const saveRecords = (newRecords) => {
     setRecords(newRecords);
@@ -71,6 +96,9 @@ export default function App() {
     const val = e.target.value.trim();
     setApiKey(val);
     localStorage.setItem('gemini_api_key', val);
+    if (val) {
+      fetchAvailableModels(val);
+    }
   };
 
   // --- Drag and Drop File Handlers ---
@@ -136,7 +164,7 @@ export default function App() {
           message: progressObj.message,
           progress: progressObj.progress
         });
-      });
+      }, selectedModel);
 
       // Save Record
       const newRecord = {
@@ -254,6 +282,23 @@ export default function App() {
               {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
+          
+          {apiKey && availableModels.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.25rem' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>AI Model Profile</label>
+              <select
+                className="expense-type-select"
+                style={{ width: '100%', padding: '0.5rem', backgroundColor: 'var(--bg-tertiary)' }}
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+              >
+                {availableModels.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <p className="upload-text-sub" style={{ fontSize: '0.75rem', marginTop: '-4px' }}>
             Enter your Google Gemini API Key to enable OCR/Extraction. It remains saved in local storage.
           </p>

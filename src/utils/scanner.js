@@ -102,12 +102,12 @@ async function parsePDF(file, onProgress) {
 /**
  * Main parser entrypoint. Supports both PDFs and standard Images.
  */
-export async function parseDocument(file, apiKey, onProgress) {
+export async function parseDocument(file, apiKey, onProgress, modelName = 'gemini-1.5-flash') {
   if (file.type === 'application/pdf') {
     // 1. Parse PDF to extract text
     const text = await parsePDF(file, onProgress);
     // 2. Call Gemini stable API with text content
-    return await extractInvoiceDetails(text, apiKey, onProgress, false);
+    return await extractInvoiceDetails(text, apiKey, onProgress, false, '', modelName);
   } else if (file.type.startsWith('image/')) {
     if (onProgress) onProgress({ stage: 'LOADING', message: 'Reading photo contents...', progress: 30 });
     
@@ -115,7 +115,7 @@ export async function parseDocument(file, apiKey, onProgress) {
     const base64Data = await fileToBase64(file);
     
     // Call Gemini API directly with the image data (Multimodal Vision API)
-    return await extractInvoiceDetails(base64Data, apiKey, onProgress, true, file.type);
+    return await extractInvoiceDetails(base64Data, apiKey, onProgress, true, file.type, modelName);
   } else {
     throw new Error('Unsupported file type. Please upload a PDF or an Image (JPG/PNG).');
   }
@@ -125,10 +125,10 @@ export async function parseDocument(file, apiKey, onProgress) {
  * Calls Gemini to retrieve structured invoice details.
  * Supports text prompt or multimodal base64 image data.
  */
-export async function extractInvoiceDetails(content, apiKey, onProgress, isImage = false, mimeType = '') {
+export async function extractInvoiceDetails(content, apiKey, onProgress, isImage = false, mimeType = '', modelName = 'gemini-1.5-flash') {
   if (onProgress) onProgress({ stage: 'AI_EXTRACTION', message: 'Analyzing document with Gemini AI...', progress: 85 });
 
-  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`;
 
   const prompt = `
 You are a highly accurate financial invoice data extractor. Analyze the document provided (text or image) and extract the required fields as a JSON object.
