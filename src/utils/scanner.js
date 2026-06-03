@@ -128,99 +128,35 @@ export async function parseDocument(file, apiKey, onProgress, modelName = 'gemin
 export async function extractInvoiceDetails(content, apiKey, onProgress, isImage = false, mimeType = '', modelName = 'gemini-1.5-flash') {
   if (onProgress) onProgress({ stage: 'AI_EXTRACTION', message: 'Analyzing document with Gemini AI...', progress: 85 });
 
-  const url = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`;
-
-  const prompt = `
-You are a highly accurate financial invoice data extractor. Analyze the document provided (text or image) and extract the required fields as a JSON object.
-
-Required Fields to Extract:
-1. "bill_number": The invoice, bill, receipt, or reference number (string). If not present or unclear, use null.
-2. "bill_date": The date of the invoice/bill formatted as YYYY-MM-DD. If not present or unclear, use null.
-3. "amount": The total payable amount as a float/number. Look for "Total", "Grand Total", "Amount Due", or total line items. If not present or unclear, use null.
-4. "supplier_name": The name of the vendor, business, shop, hospital, or supplier (string). If not present or unclear, use null.
-5. "expense_type": Classify this invoice into exactly one of: "Fuel Bill" or "Medical Bill".
-   - Classify as "Fuel Bill" if the text contains keywords related to petrol, diesel, gas station, fuel, oil, toll, vehicle refuel, power, etc.
-   - Classify as "Medical Bill" if the text contains hospital, pharmacy, medicine, lab test, clinic, doctor, prescription, treatment, healthcare, etc.
-   - If it matches neither or is ambiguous, choose the closest one or use null.
-
-Return ONLY a valid JSON object matching the following schema. Do not output any other text or markdown wrappers.
-
-JSON Schema:
-{
-  "bill_number": string | null,
-  "bill_date": string | null,
-  "amount": number | null,
-  "supplier_name": string | null,
-  "expense_type": "Fuel Bill" | "Medical Bill" | null
-}
-`;
-
-  // Build the parts payload based on input type
-  const parts = [];
-  
-  if (isImage) {
-    // Add image base64 data
-    parts.push({
-      inlineData: {
-        mimeType: mimeType,
-        data: content
-      }
-    });
-    // Add prompt instructions
-    parts.push({ text: prompt });
-  } else {
-    // Add text contents and instructions combined
-    parts.push({ text: `${prompt}\n\nInvoice Text Content:\n${content}` });
-  }
-
-  const requestBody = {
-    contents: [
-      {
-        parts: parts
-      }
-    ]
-  };
-
-  const response = await fetch(url, {
+  const response = await fetch('/api/extract', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(requestBody)
+    body: JSON.stringify({
+      content,
+      isImage,
+      mimeType,
+      modelName,
+      clientApiKey: apiKey
+    })
   });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    const errorMessage = errorData.error?.message || `HTTP error ${response.status}`;
-    throw new Error(`Gemini API Error: ${errorMessage}`);
+    const errorMessage = errorData.error || `HTTP error ${response.status}`;
+    throw new Error(`Extraction Error: ${errorMessage}`);
   }
 
-  const responseData = await response.json();
-  const rawText = responseData.candidates?.[0]?.content?.parts?.[0]?.text;
-
-  if (!rawText) {
-    throw new Error('Gemini API returned an empty response.');
-  }
-
-  try {
-    let cleanText = rawText.trim();
-    // Strip markdown code fences if Gemini outputs them (e.g. ```json ... ```)
-    if (cleanText.startsWith('```')) {
-      cleanText = cleanText.replace(/^```(json)?/i, '').replace(/```$/, '').trim();
-    }
-    const extractedData = JSON.parse(cleanText);
-    
-    if (onProgress) onProgress({ stage: 'COMPLETE', message: 'Extraction completed successfully!', progress: 100 });
-    
-    return {
-      bill_number: extractedData.bill_number || '',
-      bill_date: extractedData.bill_date || '',
-      amount: extractedData.amount !== null && extractedData.amount !== undefined ? Number(extractedData.amount) : '',
-      supplier_name: extractedData.supplier_name || '',
-      expense_type: extractedData.expense_type || 'Fuel Bill' // default classification fallback
-    };
-  } catch (error) {
-    console.error("JSON parsing error of Gemini output:", rawText, error);
-    throw new Error('Failed to parse the structured data from Gemini API.');
-  }
+  const extractedData = await response.json();
+  
+  if (onProgress) onProgress({ stage: 'COMPLETE', message: 'Extraction completed successfully!', progress: 100 });
+  
+  return {
+    bill_number: extractedData.bill_number || '',
+    bill_date: extractedData.bill_date || '',
+    amount: extractedData.amount !== null && extractedData.amount !== undefined ? Number(extractedData.amount) : '',
+    supplier_name: extractedData.supplier_name || '',
+    expense_type: extractedData.expense_type || 'Fuel Bill'
+  };
 }

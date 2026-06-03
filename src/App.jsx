@@ -143,10 +143,7 @@ export default function App() {
 
   // --- Core Processing Logic ---
   const processFile = async (file) => {
-    if (!apiKey) {
-      setErrorMsg('Please configure your Google Gemini API Key in the sidebar before uploading.');
-      return;
-    }
+    setErrorMsg('');
 
     setProcessStatus({
       status: 'running',
@@ -357,11 +354,11 @@ export default function App() {
 
         {/* API Key Missing Alert */}
         {!apiKey && (
-          <div className="api-warning-banner">
+          <div className="api-warning-banner" style={{ border: '1px solid rgba(16, 185, 129, 0.2)', background: 'linear-gradient(90deg, rgba(16, 185, 129, 0.05), rgba(99, 102, 241, 0.02))' }}>
             <div className="api-warning-content">
-              <AlertTriangle size={20} className="metric-value fuel" />
+              <Sparkles size={20} className="metric-value medical" />
               <div>
-                <strong>Gemini API Key missing:</strong> Paste your API Key in the sidebar input to enable processing.
+                <strong>Server Key Active:</strong> The scanner is running in global secure mode. Custom API key configuration is optional.
               </div>
             </div>
           </div>
