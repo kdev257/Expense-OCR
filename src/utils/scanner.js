@@ -178,10 +178,7 @@ JSON Schema:
       {
         parts: parts
       }
-    ],
-    generationConfig: {
-      responseMimeType: "application/json"
-    }
+    ]
   };
 
   const response = await fetch(url, {
@@ -206,7 +203,12 @@ JSON Schema:
   }
 
   try {
-    const extractedData = JSON.parse(rawText.trim());
+    let cleanText = rawText.trim();
+    // Strip markdown code fences if Gemini outputs them (e.g. ```json ... ```)
+    if (cleanText.startsWith('```')) {
+      cleanText = cleanText.replace(/^```(json)?/i, '').replace(/```$/, '').trim();
+    }
+    const extractedData = JSON.parse(cleanText);
     
     if (onProgress) onProgress({ stage: 'COMPLETE', message: 'Extraction completed successfully!', progress: 100 });
     
