@@ -91,7 +91,7 @@ export async function parsePDFInvoice(file, onProgress) {
 export async function extractInvoiceDetails(text, apiKey, onProgress) {
   if (onProgress) onProgress({ stage: 'AI_EXTRACTION', message: 'Analyzing text with AI...', progress: 85 });
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
   const prompt = `
 You are a highly accurate financial invoice data extractor. Analyze the invoice/receipt text provided below and extract the required fields as a JSON object.
