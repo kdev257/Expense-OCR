@@ -82,3 +82,5 @@ This project is fully ready for deployment on **Vercel** free tier:
 - **AI Extraction:** Google Gemini 1.5 Flash (via direct Google Generative AI REST API)
 - **Spreadsheet Generation:** [SheetJS (xlsx)](https://github.com/SheetJS/sheetjs)
 - **Icons:** Lucide React
+
+<!-- redeploy trigger -->
